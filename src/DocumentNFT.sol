@@ -6,41 +6,45 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract DocumentNFT is ERC721, ERC721URIStorage, Ownable {
-    uint256 private _nextTokenId;
-    mapping(uint256 => bool) private _locked;
+    uint256 private _nextTokenId = 1;
 
     constructor(
         address initialOwner
     ) ERC721("DocumentNFT", "DOCNFT") Ownable(initialOwner) {}
 
-    event Locked(uint256 tokenId);
-
-    function locked(uint256 tokenId) external view returns (bool) {
-        require(ownerOf(tokenId) != address(0));
-        return _locked[tokenId];
-    }
-
-    function safeMint(string memory hash) public onlyOwner {
+    function safeMint(address to, string memory hash) public onlyOwner {
         uint256 tokenId = _nextTokenId++;
-        _locked[tokenId] = true;
-        emit Locked(tokenId);
-        _safeMint(msg.sender, tokenId);
+        _safeMint(to, tokenId);
         _setTokenURI(tokenId, hash);
     }
 
-    function _update(
+    function ownerTransferFrom(
+        address from,
         address to,
-        uint256 tokenId,
-        address auth
-    ) internal override(ERC721) returns (address) {
-        address from = _ownerOf(tokenId);
-        if (from != address(0)) {
-            revert("Transfer not allowed"); // Prevent all transfers, making the token soulbound and non-burnable
-        }
-        return super._update(to, tokenId, auth);
+        uint256 tokenId
+    ) public payable onlyOwner {
+        //onlyowner????
+        require(msg.value == 1 ether, "1 MATIC transfer fee required");
+        _safeTransfer(from, to, tokenId, "");
+
+        // Emit an event to track fee collection (optional)
+        emit TransferFeeCollected(msg.value, from);
     }
 
-    // Required overrides
+    // Optional event to record fee collection
+    event TransferFeeCollected(uint256 amount, address payer);
+
+    function withdrawFees() public onlyOwner {
+        payable(owner()).transfer(address(this).balance);
+    }
+
+    function burn(uint256 tokenId) public onlyOwner {
+        _burn(tokenId);
+    }
+
+    function balanceToken(address user) public view returns (uint256) {
+        return balanceOf(user);
+    }
 
     function tokenURI(
         uint256 tokenId
